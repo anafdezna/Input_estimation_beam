@@ -1,0 +1,12 @@
+[workspace]
+restore_data_on_startup = True
+save_data_on_exit = True
+save_history = True
+save_non_project_files = False
+project_type = 'empty-project-type'
+recent_files = ['main_LOAD_ESTIMATION.py', 'MODULES/TRAINING/loadest_architectures.py', 'MODULES/TRAINING/loadest_functions.py', 'MODULES/TRAINING/loadest_models.py']
+
+[main]
+version = 0.2.0
+recent_files = []
+
