@@ -15,7 +15,7 @@ def main():
     import tensorflow as tf
     import tensorflow.keras as K 
     import numpy as np 
-    from MODULES.TRAINING.loadest_models import Modal_force_estimator
+    from MODULES.TRAINING.loadest_models import Modal_force_estimator, Modal_multinode_force_estimator
     
     import time  # Import the time module
 
@@ -27,45 +27,36 @@ def main():
     tf.config.list_physical_devices('GPU')  # TODO I do not find the analogous in K .
     K.utils.set_random_seed(1234)
 
-    # --- Example Usage ---
+    # --- Load dataset ---
     system_info_path = os.path.join("Data", "System_info_9modes.npy")
     system_info = np.load(system_info_path, allow_pickle = True).item()
     n_modes, Phi, m_col, c_col, k_col, uddot_true, t_vector, F_true = system_info['n_modes'], system_info['Phi'], system_info['m_col'], system_info['c_col'], system_info['k_col'], system_info['uddot_true'], system_info['t_vector'], system_info['F_true']
     # You can also remove the modes here rather than solving the problem different times for different n_modes. 
     
-    
-    # uddot_true = uddot_true[:,1:10]
-    
+    # --- Specify time and loading details
     # num_points_sim_example = F_true.shape[1] # Example value from your Newmark_beta_solver context
     ntime_points = 400
-    # 1. Prepare your t_vector:
-    # It should be a 1D NumPy array or TensorFlow tensor of shape (num_points_sim_example,)
-    # 2. If you have a single t_vector for prediction, add a batch dimension:
-    # pos0 = 850
+    # If you have a single t_vector for prediction, add a batch dimension:
     t_vector = tf.expand_dims(t_vector[0:ntime_points], axis=0) # Shape: (1, num_points_sim_example)
     uddot_true = tf.expand_dims(tf.transpose(uddot_true[:, 0:ntime_points]), axis = 0) # This should be loaded from wherever we saved the information of the specific problem, together with Phi, and the modal diagonal matrices of mass, damping and stiffness.    
     n_dof = uddot_true.shape[2]
+    # Loaded nodes: 
+    load_locs = [5] # DOF identifier of the loaded nodes. 
+    n_loadnodes = len(load_locs)
+           
 
-
-    # # define the zero load for all the nodes: 
-    # Q_zero = tf.zeros([1,num_points_sim_example, n_dof])
-    # nonzeroload = np.ones([num_points_sim_example,1])*0.5
-    # Qpred = Q_zero.numpy()
-    # Qpred[0,:,5] = nonzeroload[:,0]
-    # Phi_transp = np.transpose(Phi.numpy())
-    # Fpred = np.einsum('md, btd -> btm', Phi_transp, Qpred)
-    
-
+    # Training specifications        
     LR = 0.001
     batch_size = 1
-    n_epochs = 20000
+    n_epochs = 100000
     n_steps   = ntime_points -1
-    sensor_locs_tensor = [2,8] #for three specific DOFS instruementd
-    # sensor_locs_tensor = [1,2,3,4,5,6,7,8,9]    # for all dOFS instrumented 
+    # sensor_locs_tensor = [0,1,2,3,4,5,6,7,8,9,10]    # for all dOFS instrumented (there should be 9 but till I can fix this in the data generator we will keep the 11)
+    sensor_locs_tensor = [1,3,5,7,9] #for three specific DOFS instruementd
+
     n_sensors =len(sensor_locs_tensor)
     
     
-    heading ='May27_SingleNode5Load_sensorsat2and8'
+    heading ='Jun01_multinode26load_sensorsat_odds'
     filename = f'{heading}_{ntime_points}timepoints_{n_sensors}sensors_{n_modes}modes_{LR}LR_{n_epochs}epochs'
     folder_path = os.path.join('Output', 'Preliminary_results', filename)
     if not os.path.exists(folder_path):
@@ -80,7 +71,7 @@ def main():
     np.save(os.path.join(folder_path, 'Problem_info.npy'), Problem_info, allow_pickle=True)
     
         
-    model = Modal_force_estimator(ntime_points, n_modes, n_steps, n_dof, Phi, m_col, c_col, k_col, sensor_locs_tensor)
+    model = Modal_multinode_force_estimator(ntime_points, n_modes, n_steps, n_dof, Phi, m_col, c_col, k_col, sensor_locs_tensor, load_locs, n_loadnodes)
     model.compile(optimizer=K.optimizers.RMSprop(learning_rate = LR), 
                   loss={'acceleration_output': model.udata_loss}, # Apply udata_loss to this specific output
                   loss_weights={'acceleration_output': 1.0, 'modal_force_output': 0.0} # Only train on accel loss
@@ -134,7 +125,7 @@ def main():
     uddot_true = tf.gather(uddot_true, indices = sensor_locs_tensor, axis=2)
     
     
-    i = 1
+    i = 4
     Dt = 0.001 # Your time step
 
     # 1. Apply a style for overall aesthetics (optional, kept as in your original)
@@ -160,7 +151,7 @@ def main():
 
     # 4. Improve labels and title
     ax.set_xlabel('Time (s)') # Updated x-axis label
-    ax.set_ylabel(r'ü(t) [m/s²] at sensor $s_{2}$') # y-label remains appropriate
+    ax.set_ylabel(r'ü(t) [m/s²] at sensor $s_{9}$') # y-label remains appropriate
 
     # 5. Customize the legend
     ax.legend(frameon=True, loc='best', shadow=True)
@@ -171,7 +162,7 @@ def main():
     # 7. Adjust tick parameters
     ax.tick_params(axis='both', which='major')
     plt.tight_layout()
-    plt.savefig(os.path.join(folder_path, f'response_prediction_node_{(2*i)+3}_{n_modes}modes_AllSensors_Adam_newNN.png'),dpi = 500, bbox_inches='tight')
+    plt.savefig(os.path.join(folder_path, f'response_prediction_sensor{i+1}.png'),dpi = 500, bbox_inches='tight')
     plt.show()
 
 
@@ -180,7 +171,8 @@ def main():
     pseudoinv_Phi = tf.linalg.pinv(Phi_T)
     F_pred = tf.einsum('dm,btm->btd', pseudoinv_Phi, Q_pred)
 
-    i = 5
+
+    i = 6
     Fp   = F_pred[0,0:ntime_points,i]
     Ft = F_true[i,0:ntime_points]
     fig, ax = plt.subplots(figsize=(12, 7))
@@ -198,7 +190,7 @@ def main():
     ax.tick_params(axis='both', which='major')
 
     plt.tight_layout()
-    plt.savefig(os.path.join(folder_path, f'load_comparison_node{i}_{n_modes}modes_AllSensors_Adam_newNN.png'),dpi = 500, bbox_inches='tight')
+    plt.savefig(os.path.join(folder_path, f'load_comparison_node{i}.png'),dpi = 500, bbox_inches='tight')
     plt.show()
 
 

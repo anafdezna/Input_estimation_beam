@@ -39,6 +39,20 @@ def Fully_connected_arch_singlenode(num_points_sim, n_modes):
     return K.Model(inputs = input1, outputs = Qpred_output)
 
 
+# # Load Estimator Architecture : 
+def Fully_connected_arch_multinode(num_points_sim, n_modes, n_loadnodes):
+    input1 = K.Input(shape =(num_points_sim,), name = 'Innnputlayer')
+    lay1 = K.layers.Dense( 50*n_loadnodes, activation = 'relu', kernel_initializer="he_uniform", bias_initializer="zeros",  name='lay1',
+                      kernel_regularizer=tf.keras.regularizers.l2(0.001))(input1) #Intermediate layers
+    # lay2 = K.layers.Dense(500, activation = 'relu',  kernel_initializer="he_uniform", bias_initializer="zeros")(lay1) #Intermediate layers
+    # lay2 = K.layers.Dense(1000, activation = 'relu',  kernel_initializer="he_uniform", bias_initializer="zeros")(lay2) #Intermediate layers
+    # lay2 = K.layers.Dense(500, activation = 'relu',  kernel_initializer="he_uniform", bias_initializer="zeros")(lay2) #Intermediate layers
+    # lay2 = K.layers.Dense(5, activation = 'relu',  kernel_initializer="he_uniform", bias_initializer="zeros")(lay1) #Intermediate layers
+
+    Qpred_output = K.layers.Dense(num_points_sim*n_loadnodes, activation = 'linear')(lay1)
+    return K.Model(inputs = input1, outputs = Qpred_output)
+
+
 # --- LSTM Qpred Estimator Architecture ---
 def LSTM_Qpred_Estimator(num_points_sim, n_modes):
     """

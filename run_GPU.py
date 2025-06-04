@@ -14,7 +14,9 @@ import argparse
 # from main_bayesian import main
 # from main_GCopula_GMM import main 
 # from ground_truth_calculation import main
-from main_LOAD_ESTIMATION import main 
+# from main_LOAD_ESTIMATION import main 
+from main_Keras_LOAD_ESTIMATION import main 
+
 # from toy_squareroot import sqrt_problem
 # Execute in one GPU limiting its memory
 # tensorflow version 2.15.0

@@ -211,10 +211,10 @@ forcing_frequency_rad = 2.0 * np.pi * forcing_frequency_hz # Convert frequency t
 Omega_force = forcing_frequency_rad                             # Angular frequency of the force
 
 # Time Integration Parameters
-t_max_sim = tf.constant(1.0, dtype=tf.float64) # Total simulation time
+t_max_sim = tf.constant(0.5, dtype=tf.float64) # Total simulation time
 dt = tf.constant(0.001, dtype=tf.float64)      # Time step for integration (chosen small enough for 100Hz forcing & system modes)
 load_start_time = tf.constant(0.05, dtype=tf.float64) # Time when the load starts
-load_end_time = tf.constant(0.3, dtype=tf.float64)   # Time when the load ends
+load_end_time = tf.constant(0.15, dtype=tf.float64)   # Time when the load ends
 
 # Calculate time vector
 n_steps = tf.cast(tf.round(t_max_sim / dt), dtype=tf.int32) # Number of time steps
@@ -258,192 +258,192 @@ F_t_magnitude = F_t_sinusoidal * time_mask_for_load # Force magnitude F(t)
 F_t_physical = p_force_location @ tf.expand_dims(F_t_magnitude, axis=0) # Shape [n_dof_vertical, num_points_sim]
 # Transform to Modal Force Vector Q(t)
 Q_t_modal = tf.transpose(Phi) @ F_t_physical # Shape [n_m, num_points_sim]
-#%% ####################################################################################################################################33
-# EXPLORING A LOAD APPLIED IN TWO NODES: 
+# #%% ####################################################################################################################################33
+# # EXPLORING A LOAD APPLIED IN TWO NODES: 
 
-# Time Integration Parameters (Common for both loads)
-t_max_sim = tf.constant(1.0, dtype=tf.float64) # Total simulation time
-dt = tf.constant(0.001, dtype=tf.float64)     # Time step for integration
-load_start_time = tf.constant(0.05, dtype=tf.float64) # Time when the load starts
-load_end_time = tf.constant(0.3, dtype=tf.float64)   # Time when the load ends
+# # Time Integration Parameters (Common for both loads)
+# t_max_sim = tf.constant(1.0, dtype=tf.float64) # Total simulation time
+# dt = tf.constant(0.001, dtype=tf.float64)     # Time step for integration
+# load_start_time = tf.constant(0.05, dtype=tf.float64) # Time when the load starts
+# load_end_time = tf.constant(0.3, dtype=tf.float64)   # Time when the load ends
 
-# Calculate time vector
-n_steps = tf.cast(tf.round(t_max_sim / dt), dtype=tf.int32) # Number of time steps
-start_time_sim = tf.constant(0.0, dtype=tf.float64)
-num_points_sim = n_steps + 1  # Total number of time points (including t=0)
-t_vector = tf.linspace(start_time_sim, t_max_sim, num_points_sim) # Time vector
-actual_dt = t_vector[1] - t_vector[0]             # Actual time step used by linspace
-print(f"\nTime vector from {t_vector[0]:.3f}s to {t_vector[-1]:.3f}s with {num_points_sim} points, actual_dt = {actual_dt:.6f}s.")
+# # Calculate time vector
+# n_steps = tf.cast(tf.round(t_max_sim / dt), dtype=tf.int32) # Number of time steps
+# start_time_sim = tf.constant(0.0, dtype=tf.float64)
+# num_points_sim = n_steps + 1  # Total number of time points (including t=0)
+# t_vector = tf.linspace(start_time_sim, t_max_sim, num_points_sim) # Time vector
+# actual_dt = t_vector[1] - t_vector[0]             # Actual time step used by linspace
+# print(f"\nTime vector from {t_vector[0]:.3f}s to {t_vector[-1]:.3f}s with {num_points_sim} points, actual_dt = {actual_dt:.6f}s.")
 
-# --- Define Parameters for Load 1 ---
-force_amplitude_1 = tf.constant(5.0, dtype=tf.float64)       # Amplitude of the first sinusoidal force
-forcing_frequency_hz_1 = tf.constant(30.0, dtype=tf.float64) # Frequency of the first force in Hz
-forcing_frequency_rad_1 = 2.0 * np.pi * forcing_frequency_hz_1 # Convert frequency to rad/s
-Omega_force_1 = forcing_frequency_rad_1                      # Angular frequency of the first force
-# Define DOF index for load 1 (e.g., corresponds to Node 2's vertical DOF)
-# USER: Adjust this based on your beam's DOF numbering.
-# For a beam with N nodes, if each node has 1 vertical DOF, node 2 could be index 1 (0-indexed)
-# or if nodes are 1-indexed, it would be index 1.
-# If 2 DOFs per node (e.g. disp and rot), this needs careful mapping.
-# Assuming vertical DOFs are indexed sequentially.
-load_dof_index_1 = tf.constant(2, dtype=tf.int32) # Example for Node 2 (0-indexed: 0, 1, 2...)
-                                                # This would be the 2nd DOF if 0 is the first.
+# # --- Define Parameters for Load 1 ---
+# force_amplitude_1 = tf.constant(5.0, dtype=tf.float64)       # Amplitude of the first sinusoidal force
+# forcing_frequency_hz_1 = tf.constant(30.0, dtype=tf.float64) # Frequency of the first force in Hz
+# forcing_frequency_rad_1 = 2.0 * np.pi * forcing_frequency_hz_1 # Convert frequency to rad/s
+# Omega_force_1 = forcing_frequency_rad_1                      # Angular frequency of the first force
+# # Define DOF index for load 1 (e.g., corresponds to Node 2's vertical DOF)
+# # USER: Adjust this based on your beam's DOF numbering.
+# # For a beam with N nodes, if each node has 1 vertical DOF, node 2 could be index 1 (0-indexed)
+# # or if nodes are 1-indexed, it would be index 1.
+# # If 2 DOFs per node (e.g. disp and rot), this needs careful mapping.
+# # Assuming vertical DOFs are indexed sequentially.
+# load_dof_index_1 = tf.constant(2, dtype=tf.int32) # Example for Node 2 (0-indexed: 0, 1, 2...)
+#                                                 # This would be the 2nd DOF if 0 is the first.
 
-# --- Define Parameters for Load 2 ---
-force_amplitude_2 = tf.constant(8.0, dtype=tf.float64)       # Amplitude of the second sinusoidal force
-forcing_frequency_hz_2 = tf.constant(15.0, dtype=tf.float64) # Frequency of the second force in Hz
-forcing_frequency_rad_2 = 2.0 * np.pi * forcing_frequency_hz_2 # Convert frequency to rad/s
-Omega_force_2 = forcing_frequency_rad_2                      # Angular frequency of the second force
-# Define DOF index for load 2 (e.g., corresponds to Node 6's vertical DOF)
-# USER: Adjust this based on your beam's DOF numbering.
-load_dof_index_2 = tf.constant(6, dtype=tf.int32) # Example for Node 6 (0-indexed: 0, 1, ..., 5, ...)
-                                                # This would be the 6th DOF.
+# # --- Define Parameters for Load 2 ---
+# force_amplitude_2 = tf.constant(8.0, dtype=tf.float64)       # Amplitude of the second sinusoidal force
+# forcing_frequency_hz_2 = tf.constant(15.0, dtype=tf.float64) # Frequency of the second force in Hz
+# forcing_frequency_rad_2 = 2.0 * np.pi * forcing_frequency_hz_2 # Convert frequency to rad/s
+# Omega_force_2 = forcing_frequency_rad_2                      # Angular frequency of the second force
+# # Define DOF index for load 2 (e.g., corresponds to Node 6's vertical DOF)
+# # USER: Adjust this based on your beam's DOF numbering.
+# load_dof_index_2 = tf.constant(6, dtype=tf.int32) # Example for Node 6 (0-indexed: 0, 1, ..., 5, ...)
+#                                                 # This would be the 6th DOF.
 
-# --- Helper function to check and adjust DOF index ---
-def get_safe_load_dof(requested_dof_index, constrained_dofs_np, free_dofs_np, n_dof_total, dof_name):
-    """Checks if the DOF is constrained and suggests alternatives."""
-    dof_index = requested_dof_index.numpy()
-    if dof_index in constrained_dofs_np:
-        print(f"WARNING: {dof_name} application at DOF index {dof_index} which is constrained! Adjusting.")
-        # Basic adjustment: try next or previous if possible (simple example)
-        if dof_index + 1 < n_dof_total and (dof_index + 1) not in constrained_dofs_np:
-            dof_index = dof_index + 1
-        elif dof_index - 1 >= 0 and (dof_index - 1) not in constrained_dofs_np:
-            dof_index = dof_index - 1
-        else: # Fallback if no simple adjustment works
-            available_free_dofs = [dof for dof in free_dofs_np if 0 <= dof < n_dof_total]
-            if available_free_dofs:
-                # Try to pick a DOF that is not too close to the ends if possible
-                internal_free_dofs = [dof for dof in available_free_dofs if 0 < dof < n_dof_total-1]
-                if internal_free_dofs:
-                    dof_index = internal_free_dofs[len(internal_free_dofs)//2] # middle of internal free dofs
-                else:
-                    dof_index = available_free_dofs[len(available_free_dofs)//2] # middle of any free dofs
-            else:
-                # This case should ideally not happen if there are any free DOFs
-                print(f"ERROR: No suitable free DOF found for {dof_name}. Using first free DOF as last resort or failing.")
-                if free_dofs_np.size > 0:
-                    dof_index = free_dofs_np[0]
-                else:
-                    raise ValueError("No free DOFs available to apply load.")
-        print(f"{dof_name} application point shifted to DOF index: {dof_index}")
-    return tf.constant(dof_index, dtype=tf.int32)
+# # --- Helper function to check and adjust DOF index ---
+# def get_safe_load_dof(requested_dof_index, constrained_dofs_np, free_dofs_np, n_dof_total, dof_name):
+#     """Checks if the DOF is constrained and suggests alternatives."""
+#     dof_index = requested_dof_index.numpy()
+#     if dof_index in constrained_dofs_np:
+#         print(f"WARNING: {dof_name} application at DOF index {dof_index} which is constrained! Adjusting.")
+#         # Basic adjustment: try next or previous if possible (simple example)
+#         if dof_index + 1 < n_dof_total and (dof_index + 1) not in constrained_dofs_np:
+#             dof_index = dof_index + 1
+#         elif dof_index - 1 >= 0 and (dof_index - 1) not in constrained_dofs_np:
+#             dof_index = dof_index - 1
+#         else: # Fallback if no simple adjustment works
+#             available_free_dofs = [dof for dof in free_dofs_np if 0 <= dof < n_dof_total]
+#             if available_free_dofs:
+#                 # Try to pick a DOF that is not too close to the ends if possible
+#                 internal_free_dofs = [dof for dof in available_free_dofs if 0 < dof < n_dof_total-1]
+#                 if internal_free_dofs:
+#                     dof_index = internal_free_dofs[len(internal_free_dofs)//2] # middle of internal free dofs
+#                 else:
+#                     dof_index = available_free_dofs[len(available_free_dofs)//2] # middle of any free dofs
+#             else:
+#                 # This case should ideally not happen if there are any free DOFs
+#                 print(f"ERROR: No suitable free DOF found for {dof_name}. Using first free DOF as last resort or failing.")
+#                 if free_dofs_np.size > 0:
+#                     dof_index = free_dofs_np[0]
+#                 else:
+#                     raise ValueError("No free DOFs available to apply load.")
+#         print(f"{dof_name} application point shifted to DOF index: {dof_index}")
+#     return tf.constant(dof_index, dtype=tf.int32)
 
-# --- Ensure load DOFs are not constrained ---
-# Convert TensorFlow tensors to NumPy for easier handling in the helper, if not already.
-# These would typically be defined before this section.
-# Make sure n_dof_vertical, constrained_dofs, and free_dofs are correctly defined.
-# Example placeholder values if not defined:
-if 'n_dof_vertical' not in globals():
-    print("Warning: 'n_dof_vertical' not found. Using a placeholder value of 10.")
-    n_dof_vertical = 10
-if 'constrained_dofs' not in globals():
-    print("Warning: 'constrained_dofs' not found. Using placeholder values [0, 9].")
-    constrained_dofs = tf.constant([0, n_dof_vertical - 1], dtype=tf.int32)
-if 'free_dofs' not in globals():
-     print("Warning: 'free_dofs' not found. Calculating based on n_dof_vertical and constrained_dofs.")
-     all_dofs_temp = tf.range(n_dof_vertical, dtype=tf.int32)
-     is_constrained_temp = tf.reduce_any(tf.equal(tf.expand_dims(all_dofs_temp, axis=1), tf.expand_dims(constrained_dofs, axis=0)), axis=1)
-     free_dofs = tf.boolean_mask(all_dofs_temp, tf.logical_not(is_constrained_temp))
-if 'Phi' not in globals():
-    print("Warning: 'Phi' (modal matrix) not found. Using a placeholder random matrix.")
-    n_modes_example = min(5, free_dofs.shape[0] if free_dofs.shape[0] > 0 else 1) # ensure n_modes <= n_free_dofs
-    if n_modes_example == 0 and n_dof_vertical > 0 : n_modes_example = 1 # fallback if no free dofs but some total dofs
-    if n_dof_vertical == 0 : raise ValueError("n_dof_vertical cannot be zero.")
-    Phi = tf.random.uniform(shape=(n_dof_vertical, n_modes_example), dtype=tf.float64)
-    n_m = Phi.shape[1]
-elif Phi.shape[0] != n_dof_vertical:
-     raise ValueError(f"Phi shape {Phi.shape} is inconsistent with n_dof_vertical {n_dof_vertical}")
-else:
-    n_m = Phi.shape[1]
-
-
-constrained_dofs_np = constrained_dofs.numpy()
-free_dofs_np = free_dofs.numpy()
-
-# Adjust load_dof_index_1 if it's constrained
-load_dof_index_1_safe = get_safe_load_dof(load_dof_index_1, constrained_dofs_np, free_dofs_np, n_dof_vertical, "Load 1")
-print(f"Load 1 applied at vertical DOF index: {load_dof_index_1_safe.numpy()}")
-
-# Adjust load_dof_index_2 if it's constrained
-if load_dof_index_1_safe.numpy() == load_dof_index_2.numpy(): # Check if they ended up the same
-    print(f"Warning: Initial DOF for Load 2 ({load_dof_index_2.numpy()}) is same as safe DOF for Load 1 ({load_dof_index_1_safe.numpy()}).")
-    # Attempt to pick a different DOF for load 2 if they clash, simple strategy:
-    potential_dof_2 = (load_dof_index_2.numpy() + 1) % n_dof_vertical
-    if potential_dof_2 == load_dof_index_1_safe.numpy(): # if still same, try another
-        potential_dof_2 = (load_dof_index_2.numpy() - 1 + n_dof_vertical) % n_dof_vertical # Ensure positive
-    load_dof_index_2 = tf.constant(potential_dof_2, dtype=tf.int32)
-    print(f"Attempting to use DOF {load_dof_index_2.numpy()} for Load 2 instead.")
+# # --- Ensure load DOFs are not constrained ---
+# # Convert TensorFlow tensors to NumPy for easier handling in the helper, if not already.
+# # These would typically be defined before this section.
+# # Make sure n_dof_vertical, constrained_dofs, and free_dofs are correctly defined.
+# # Example placeholder values if not defined:
+# if 'n_dof_vertical' not in globals():
+#     print("Warning: 'n_dof_vertical' not found. Using a placeholder value of 10.")
+#     n_dof_vertical = 10
+# if 'constrained_dofs' not in globals():
+#     print("Warning: 'constrained_dofs' not found. Using placeholder values [0, 9].")
+#     constrained_dofs = tf.constant([0, n_dof_vertical - 1], dtype=tf.int32)
+# if 'free_dofs' not in globals():
+#      print("Warning: 'free_dofs' not found. Calculating based on n_dof_vertical and constrained_dofs.")
+#      all_dofs_temp = tf.range(n_dof_vertical, dtype=tf.int32)
+#      is_constrained_temp = tf.reduce_any(tf.equal(tf.expand_dims(all_dofs_temp, axis=1), tf.expand_dims(constrained_dofs, axis=0)), axis=1)
+#      free_dofs = tf.boolean_mask(all_dofs_temp, tf.logical_not(is_constrained_temp))
+# if 'Phi' not in globals():
+#     print("Warning: 'Phi' (modal matrix) not found. Using a placeholder random matrix.")
+#     n_modes_example = min(5, free_dofs.shape[0] if free_dofs.shape[0] > 0 else 1) # ensure n_modes <= n_free_dofs
+#     if n_modes_example == 0 and n_dof_vertical > 0 : n_modes_example = 1 # fallback if no free dofs but some total dofs
+#     if n_dof_vertical == 0 : raise ValueError("n_dof_vertical cannot be zero.")
+#     Phi = tf.random.uniform(shape=(n_dof_vertical, n_modes_example), dtype=tf.float64)
+#     n_m = Phi.shape[1]
+# elif Phi.shape[0] != n_dof_vertical:
+#      raise ValueError(f"Phi shape {Phi.shape} is inconsistent with n_dof_vertical {n_dof_vertical}")
+# else:
+#     n_m = Phi.shape[1]
 
 
-load_dof_index_2_safe = get_safe_load_dof(load_dof_index_2, constrained_dofs_np, free_dofs_np, n_dof_vertical, "Load 2")
-print(f"Load 2 applied at vertical DOF index: {load_dof_index_2_safe.numpy()}")
+# constrained_dofs_np = constrained_dofs.numpy()
+# free_dofs_np = free_dofs.numpy()
 
-if load_dof_index_1_safe.numpy() == load_dof_index_2_safe.numpy():
-    print(f"CRITICAL WARNING: Both loads are applied to the same DOF index {load_dof_index_1_safe.numpy()} after safety checks! Review your DOF choices or safety logic.")
+# # Adjust load_dof_index_1 if it's constrained
+# load_dof_index_1_safe = get_safe_load_dof(load_dof_index_1, constrained_dofs_np, free_dofs_np, n_dof_vertical, "Load 1")
+# print(f"Load 1 applied at vertical DOF index: {load_dof_index_1_safe.numpy()}")
+
+# # Adjust load_dof_index_2 if it's constrained
+# if load_dof_index_1_safe.numpy() == load_dof_index_2.numpy(): # Check if they ended up the same
+#     print(f"Warning: Initial DOF for Load 2 ({load_dof_index_2.numpy()}) is same as safe DOF for Load 1 ({load_dof_index_1_safe.numpy()}).")
+#     # Attempt to pick a different DOF for load 2 if they clash, simple strategy:
+#     potential_dof_2 = (load_dof_index_2.numpy() + 1) % n_dof_vertical
+#     if potential_dof_2 == load_dof_index_1_safe.numpy(): # if still same, try another
+#         potential_dof_2 = (load_dof_index_2.numpy() - 1 + n_dof_vertical) % n_dof_vertical # Ensure positive
+#     load_dof_index_2 = tf.constant(potential_dof_2, dtype=tf.int32)
+#     print(f"Attempting to use DOF {load_dof_index_2.numpy()} for Load 2 instead.")
 
 
-# --- Create Load Vectors (Spatial Distribution) ---
-# For Load 1
-p_force_location_1_np = np.zeros(n_dof_vertical)
-p_force_location_1_np[load_dof_index_1_safe.numpy()] = 1.0
-p_force_location_1 = tf.constant(p_force_location_1_np, shape=(n_dof_vertical, 1), dtype=tf.float64)
+# load_dof_index_2_safe = get_safe_load_dof(load_dof_index_2, constrained_dofs_np, free_dofs_np, n_dof_vertical, "Load 2")
+# print(f"Load 2 applied at vertical DOF index: {load_dof_index_2_safe.numpy()}")
 
-# For Load 2
-p_force_location_2_np = np.zeros(n_dof_vertical)
-p_force_location_2_np[load_dof_index_2_safe.numpy()] = 1.0
-p_force_location_2 = tf.constant(p_force_location_2_np, shape=(n_dof_vertical, 1), dtype=tf.float64)
+# if load_dof_index_1_safe.numpy() == load_dof_index_2_safe.numpy():
+#     print(f"CRITICAL WARNING: Both loads are applied to the same DOF index {load_dof_index_1_safe.numpy()} after safety checks! Review your DOF choices or safety logic.")
 
-# --- Define Force Magnitudes F(t) over Time ---
-# Common time window mask for both loads
-mask_load_active = tf.logical_and(t_vector >= load_start_time, t_vector <= load_end_time)
-time_mask_for_load = tf.cast(mask_load_active, dtype=tf.float64)
 
-# Force magnitude for Load 1
-F_t_sinusoidal_1 = force_amplitude_1 * tf.sin(Omega_force_1 * t_vector)
-F_t_magnitude_1 = F_t_sinusoidal_1 * time_mask_for_load # Shape [num_points_sim]
+# # --- Create Load Vectors (Spatial Distribution) ---
+# # For Load 1
+# p_force_location_1_np = np.zeros(n_dof_vertical)
+# p_force_location_1_np[load_dof_index_1_safe.numpy()] = 1.0
+# p_force_location_1 = tf.constant(p_force_location_1_np, shape=(n_dof_vertical, 1), dtype=tf.float64)
 
-# Force magnitude for Load 2
-F_t_sinusoidal_2 = force_amplitude_2 * tf.sin(Omega_force_2 * t_vector)
-F_t_magnitude_2 = F_t_sinusoidal_2 * time_mask_for_load # Shape [num_points_sim]
+# # For Load 2
+# p_force_location_2_np = np.zeros(n_dof_vertical)
+# p_force_location_2_np[load_dof_index_2_safe.numpy()] = 1.0
+# p_force_location_2 = tf.constant(p_force_location_2_np, shape=(n_dof_vertical, 1), dtype=tf.float64)
 
-# --- Calculate Full Nodal Force Vector F(t) in physical coordinates ---
-# Contribution from Load 1
-F_t_physical_1 = p_force_location_1 @ tf.expand_dims(F_t_magnitude_1, axis=0) # Shape [n_dof_vertical, num_points_sim]
+# # --- Define Force Magnitudes F(t) over Time ---
+# # Common time window mask for both loads
+# mask_load_active = tf.logical_and(t_vector >= load_start_time, t_vector <= load_end_time)
+# time_mask_for_load = tf.cast(mask_load_active, dtype=tf.float64)
 
-# Contribution from Load 2
-F_t_physical_2 = p_force_location_2 @ tf.expand_dims(F_t_magnitude_2, axis=0) # Shape [n_dof_vertical, num_points_sim]
+# # Force magnitude for Load 1
+# F_t_sinusoidal_1 = force_amplitude_1 * tf.sin(Omega_force_1 * t_vector)
+# F_t_magnitude_1 = F_t_sinusoidal_1 * time_mask_for_load # Shape [num_points_sim]
 
-# Total physical force vector by summing contributions
-F_t_physical = F_t_physical_1 + F_t_physical_2 # Shape [n_dof_vertical, num_points_sim]
+# # Force magnitude for Load 2
+# F_t_sinusoidal_2 = force_amplitude_2 * tf.sin(Omega_force_2 * t_vector)
+# F_t_magnitude_2 = F_t_sinusoidal_2 * time_mask_for_load # Shape [num_points_sim]
 
-# --- Transform to Modal Force Vector Q(t) ---
-if Phi.shape[0] != F_t_physical.shape[0]:
-    raise ValueError(f"Mismatch in dimensions for modal transformation: Phi has {Phi.shape[0]} rows, F_t_physical has {F_t_physical.shape[0]} rows (n_dof_vertical).")
+# # --- Calculate Full Nodal Force Vector F(t) in physical coordinates ---
+# # Contribution from Load 1
+# F_t_physical_1 = p_force_location_1 @ tf.expand_dims(F_t_magnitude_1, axis=0) # Shape [n_dof_vertical, num_points_sim]
 
-Q_t_modal = tf.transpose(Phi) @ F_t_physical # Shape [n_m, num_points_sim]
+# # Contribution from Load 2
+# F_t_physical_2 = p_force_location_2 @ tf.expand_dims(F_t_magnitude_2, axis=0) # Shape [n_dof_vertical, num_points_sim]
 
-# --- Example Print Outs ---
-print(f"\nShape of F_t_magnitude_1: {F_t_magnitude_1.shape}")
-print(f"Shape of F_t_magnitude_2: {F_t_magnitude_2.shape}")
-print(f"Shape of p_force_location_1: {p_force_location_1.shape}")
-print(f"Shape of p_force_location_2: {p_force_location_2.shape}")
-print(f"Shape of F_t_physical: {F_t_physical.shape}")
-print(f"Shape of Phi: {Phi.shape}")
-print(f"Shape of Q_t_modal: {Q_t_modal.shape}")
+# # Total physical force vector by summing contributions
+# F_t_physical = F_t_physical_1 + F_t_physical_2 # Shape [n_dof_vertical, num_points_sim]
 
-# You can now use Q_t_modal in your modal integration scheme.
-# For example, to check values at a specific time step (e.g., when load is active):
-# Find a time step index where the load is active
-example_time_index = tf.where(mask_load_active).numpy()
-if example_time_index.size > 0:
-    idx = example_time_index[len(example_time_index)//2, 0] # pick a middle index where load is active
-    print(f"\nExample physical force vector F(t) at time t={t_vector[idx]:.3f}s (column {idx}):")
-    print(F_t_physical[:, idx].numpy())
-    print(f"Corresponding modal force vector Q(t) at time t={t_vector[idx]:.3f}s (column {idx}):")
-    print(Q_t_modal[:, idx].numpy())
-else:
-    print("\nLoad is not active at any point in the time vector according to mask_load_active.")
+# # --- Transform to Modal Force Vector Q(t) ---
+# if Phi.shape[0] != F_t_physical.shape[0]:
+#     raise ValueError(f"Mismatch in dimensions for modal transformation: Phi has {Phi.shape[0]} rows, F_t_physical has {F_t_physical.shape[0]} rows (n_dof_vertical).")
+
+# Q_t_modal = tf.transpose(Phi) @ F_t_physical # Shape [n_m, num_points_sim]
+
+# # --- Example Print Outs ---
+# print(f"\nShape of F_t_magnitude_1: {F_t_magnitude_1.shape}")
+# print(f"Shape of F_t_magnitude_2: {F_t_magnitude_2.shape}")
+# print(f"Shape of p_force_location_1: {p_force_location_1.shape}")
+# print(f"Shape of p_force_location_2: {p_force_location_2.shape}")
+# print(f"Shape of F_t_physical: {F_t_physical.shape}")
+# print(f"Shape of Phi: {Phi.shape}")
+# print(f"Shape of Q_t_modal: {Q_t_modal.shape}")
+
+# # You can now use Q_t_modal in your modal integration scheme.
+# # For example, to check values at a specific time step (e.g., when load is active):
+# # Find a time step index where the load is active
+# example_time_index = tf.where(mask_load_active).numpy()
+# if example_time_index.size > 0:
+#     idx = example_time_index[len(example_time_index)//2, 0] # pick a middle index where load is active
+#     print(f"\nExample physical force vector F(t) at time t={t_vector[idx]:.3f}s (column {idx}):")
+#     print(F_t_physical[:, idx].numpy())
+#     print(f"Corresponding modal force vector Q(t) at time t={t_vector[idx]:.3f}s (column {idx}):")
+#     print(Q_t_modal[:, idx].numpy())
+# else:
+#     print("\nLoad is not active at any point in the time vector according to mask_load_active.")
     
 
 
@@ -467,8 +467,8 @@ System_info = {
         'F_true': F_t_physical,
         }
 
-prueba_path = os.path.join("MODULES", "Load_estimation")
-np.save(os.path.join(prueba_path, f'System_info_{n_m}modes_2NODELOAD.npy'), System_info, allow_pickle=True)
+prueba_path = os.path.join("Data")
+np.save(os.path.join(prueba_path, f'System_info_{n_m}modes_shorter.npy'), System_info, allow_pickle=True)
 
 
 # YOu need to vectorize this function in order to accommodate batch dimension (even if it is 1) Otherwise it is doing a wrong transpose

@@ -10,14 +10,32 @@ import os
 import tensorflow as tf
 import tensorflow.keras as K 
 import numpy as np 
-from MODULES.TRAINING.loadest_architectures import  Fully_connected_arch, Fully_connected_arch_singlenode
+from MODULES.TRAINING.loadest_architectures import  Fully_connected_arch, Fully_connected_arch_singlenode, Fully_connected_arch_multinode
 from MODULES.TRAINING.loadest_functions import Newmark_beta_solver
 
 # --- 0. TensorFlow Setup ---
 # Ensure TensorFlow uses float64 for better numerical stability in FEM calculations
 tf.keras.backend.set_floatx('float64')
 K.utils.set_random_seed(1234)
-
+        
+# # To make this function JIT-compilable and efficient, we decorate it.
+# # We must also provide an input_signature.
+# # The 'None' dimensions allow for variable batch sizes, time steps, modes, and DOFs.
+# Newmark_beta_solver_jitted_compiled = tf.function(
+#     Newmark_beta_solver,
+#     input_signature=[
+#         tf.TensorSpec(shape=[None, None, None], dtype=tf.float64, name="Qpred"),
+#         tf.TensorSpec(shape=[None, None], dtype=tf.float64, name="t_vector"),
+#         tf.TensorSpec(shape=[None, None], dtype=tf.float64, name="Phi"),
+#         tf.TensorSpec(shape=[None, 1], dtype=tf.float64, name="m_col"),
+#         tf.TensorSpec(shape=[None, 1], dtype=tf.float64, name="c_col"),
+#         tf.TensorSpec(shape=[None, 1], dtype=tf.float64, name="k_col"),
+#         # Optional: if you want to pass Newmark params as Tensors:
+#         # tf.TensorSpec(shape=[], dtype=tf.float64, name="beta_newmark"),
+#         # tf.TensorSpec(shape=[], dtype=tf.float64, name="gamma_newmark"),
+#     ],
+#     jit_compile=True
+# )
 
 class Modal_force_estimator(K.Model):
     def __init__(self, num_points_sim, n_modes, n_steps, n_dof, Phi, m_col, c_col, k_col, sensor_locs, **kwargs):
@@ -33,7 +51,7 @@ class Modal_force_estimator(K.Model):
         self.k_col = k_col
         self.sensor_locs = sensor_locs
         self.fullyconnected_nodeloadestimator = Fully_connected_arch_singlenode(num_points_sim, n_modes)
-        # self.fullyconnected_loadestimator = Fully_connected_arch(num_points_sim, n_modes)
+        # self.fullyconnected_full_loadestimator = Fully_connected_arch(num_points_sim, n_modes)
         
 
     def call(self, inputs):
@@ -58,8 +76,21 @@ class Modal_force_estimator(K.Model):
         # fullyQ = self.fullyconnected_loadestimator(self.t_vector)
         # self.Qpred = tf.reshape(fullyQ, [-1, self.num_points_sim, self.n_modes])
         
-        # Solving the uncopuled system of equations:
-        uddot_pred_full = Newmark_beta_solver(self.Qpred,self.t_vector,self.Phi, self.m_col, self.c_col, self.k_col, self.n_steps)
+        ############ TODO: WORK IN PROGRESS ATTEMPTING TO MAKE JIT COMPATIBLE NEWMARK BETA 
+        # Solving the uncopuled system of equations:         
+        # uddot_pred_full = Newmark_beta_solver(self.Qpred,self.t_vector,self.Phi, self.m_col, self.c_col, self.k_col)
+        
+        # *** Call the JIT-COMPILED Newmark Beta Solver ***
+        uddot_pred_full = Newmark_beta_solver_jitted_compiled(
+            self.Qpred, # This is self.Qpred from your original code
+            self.t_vector,         # This is self.t_vector from your original code
+            self.Phi,
+            self.m_col,
+            self.c_col,
+            self.k_col
+            # beta_newmark and gamma_newmark will use their default tf.constant values
+        )
+
         
         # ## IF YOU WANT TO USE ALL DOFS AS RECEPTORS (SENSORS): 
         # #COMMENT WHEN YOU WANT TO FILTER BY NUMBER OF SENSORS 
@@ -106,7 +137,90 @@ class Modal_force_estimator(K.Model):
   
 
 
+class Modal_multinode_force_estimator(K.Model):
+    def __init__(self, num_points_sim, n_modes, n_steps, n_dof, Phi, m_col, c_col, k_col, sensor_locs, load_locs, n_loadnodes, **kwargs):
+        super(Modal_multinode_force_estimator, self).__init__()
+        self.num_points_sim = num_points_sim
+        self.n_modes = n_modes
+        self.n_steps = n_steps
+        self.n_dof = n_dof
+        self.load_locs = load_locs  # vector with the location of the loaded nodes 
+        self.nload_nodes = n_loadnodes # number of nodes with load (len(load_locs)
 
+        self.Phi = Phi # Fixed truncated modal matrix for n_modes mode shapes in the columns. 
+        self.m_col = m_col # Fixed diagonal modal mass matrix with dims (n_modes, 1). Same for damping and stiffness.
+        self.c_col = c_col
+        self.k_col = k_col
+        self.sensor_locs = sensor_locs
+        self.fullyconnected_multinodeloadestimator = Fully_connected_arch_multinode(num_points_sim, n_modes, n_loadnodes)
+        
+
+    def call(self, inputs):
+        self.t_vector, self.u_true = inputs 
+        
+        ### When considering we know load is applied only at node 5. Assumption of known load location. However, as we work with modal load, null F turns into nonzero modal forces, which then turns back to be a non-zero estimated force at other nodes. 
+        self.load_info = self.fullyconnected_multinodeloadestimator(self.t_vector) #shape [batch_size, num_points_sim] as only for one node we estimate the modal force. 
+        nodeloads = tf.reshape(self.load_info, [-1, self.num_points_sim, self.nload_nodes]) # Shape: (B, timepoints, loadednodes)
+        
+        one_hot_mapping = tf.one_hot(
+            indices=self.load_locs,
+            depth=self.n_dof,
+            dtype=nodeloads.dtype
+        )#Masking vector with zero in all locations except at node = node_load, where we assume the laod is unknonwn. 
+
+        Fpred = tf.einsum('btl,ld->btd', nodeloads, one_hot_mapping) # Shape = (batch_size, time_points, n_dofs)
+       
+        # Q = Phi_transp * F(t) 
+        Phi_transp = tf.transpose(self.Phi) #shape = (n_modes, n_dof)
+        ## for the einsum: m= n_modes, d = n_dof, b  =batch_size, t = num_points_sim 
+        self.Qpred = tf.einsum('md,btd->btm', Phi_transp, Fpred)
+          
+             
+        # Solving the uncopuled system of equations:
+        uddot_pred_full = Newmark_beta_solver(self.Qpred,self.t_vector,self.Phi, self.m_col, self.c_col, self.k_col, self.n_steps)
+        
+        # ## IF YOU WANT TO USE ALL DOFS AS RECEPTORS (SENSORS): 
+        # #COMMENT WHEN YOU WANT TO FILTER BY NUMBER OF SENSORS 
+        # uddot_pred = uddot_pred_full 
+        # self.uddot_true = self.u_true
+        
+        # # RESTRICTION FUNCTION TO RETAIN ONLY THE SENSOR LOCATIONS AS THE OUTPUT RESPONSE 
+        # # COMMENT WHEN YOU WANT TO USE ALL DOFS AS SENSORS.  Here we mask or select the desired locations where sensors are. 
+        self.uddot_true = tf.gather(self.u_true, indices = self.sensor_locs, axis=2)
+        uddot_pred = tf.gather(uddot_pred_full, indices = self.sensor_locs, axis = 2) #should be now shape (batch_size, num_sim_points, num_sensors) 
+
+        
+        return {"acceleration_output": uddot_pred, "modal_force_output": self.Qpred}
+    
+    def udata_loss(self, y_true, y_pred_acc):
+
+        response_squared_error = tf.square(self.uddot_true - y_pred_acc)
+        Loss_data = tf.math.reduce_mean(response_squared_error, axis = None)
+        return Loss_data
+    
+    # get_config and from_config methods (ensure they are complete and handle all necessary attributes)
+    def get_config(self):
+        config = {
+            'num_points_sim': self.num_points_sim,
+            'n_modes': self.n_modes,
+            'n_steps': self.n_steps,
+            'n_dof': self.n_dof,
+            'Phi': self.Phi.numpy().tolist() if tf.is_tensor(self.Phi) else self.Phi,
+            'm_col': self.m_col.numpy().tolist() if tf.is_tensor(self.m_col) else self.m_col,
+            'c_col': self.c_col.numpy().tolist() if tf.is_tensor(self.c_col) else self.c_col,
+            'k_col': self.k_col.numpy().tolist() if tf.is_tensor(self.k_col) else self.k_col,
+            'node_load_idx': self.node_load_idx 
+        }
+        base_config = super(Modal_force_estimator, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config):
+        for key in ['Phi', 'm_col', 'c_col', 'k_col']:
+            if key in config and isinstance(config[key], list):
+                config[key] = tf.convert_to_tensor(config[key], dtype=tf.float32)
+        # Ensure all __init__ args are present in config or handled
+        return cls(**config)
 
 # class Modal_force_estimator_manyloadpoints(K.Model):
 #     def __init__(self, num_points_sim, n_modes, n_steps, n_dof, Phi, m_col, c_col, k_col, sensor_locs, **kwargs):
