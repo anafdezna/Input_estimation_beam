@@ -78,18 +78,18 @@ class Modal_force_estimator(K.Model):
         
         ############ TODO: WORK IN PROGRESS ATTEMPTING TO MAKE JIT COMPATIBLE NEWMARK BETA 
         # Solving the uncopuled system of equations:         
-        # uddot_pred_full = Newmark_beta_solver(self.Qpred,self.t_vector,self.Phi, self.m_col, self.c_col, self.k_col)
+        uddot_pred_full = Newmark_beta_solver(self.Qpred,self.t_vector,self.Phi, self.m_col, self.c_col, self.k_col)
         
-        # *** Call the JIT-COMPILED Newmark Beta Solver ***
-        uddot_pred_full = Newmark_beta_solver_jitted_compiled(
-            self.Qpred, # This is self.Qpred from your original code
-            self.t_vector,         # This is self.t_vector from your original code
-            self.Phi,
-            self.m_col,
-            self.c_col,
-            self.k_col
-            # beta_newmark and gamma_newmark will use their default tf.constant values
-        )
+        # # *** Call the JIT-COMPILED Newmark Beta Solver ***
+        # uddot_pred_full = Newmark_beta_solver_jitted_compiled(
+        #     self.Qpred, # This is self.Qpred from your original code
+        #     self.t_vector,         # This is self.t_vector from your original code
+        #     self.Phi,
+        #     self.m_col,
+        #     self.c_col,
+        #     self.k_col
+        #     # beta_newmark and gamma_newmark will use their default tf.constant values
+        # )
 
         
         # ## IF YOU WANT TO USE ALL DOFS AS RECEPTORS (SENSORS): 
