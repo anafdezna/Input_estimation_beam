@@ -22,13 +22,13 @@ def main():
     K.utils.set_random_seed(1234)
 
     # --- Load dataset ---
-    system_info_path = os.path.join("Data", "System_info_9modes_shorter.npy.npy")
+    system_info_path = os.path.join("Data", "System_info_9modes.npy")
     system_info = np.load(system_info_path, allow_pickle = True).item()
     n_modes, Phi, m_col, c_col, k_col, uddot_true, t_vector, F_true = system_info['n_modes'], system_info['Phi'], system_info['m_col'], system_info['c_col'], system_info['k_col'], system_info['uddot_true'], system_info['t_vector'], system_info['F_true']
     
     # --- Specify time and loading details
     # num_points_sim_example = F_true.shape[1] # Example value from your Newmark_beta_solver context
-    ntime_points = 250
+    ntime_points = 400 # I think this value is the key that prevents a faster training. We need to solve the newmark method sequentially for a time vector with all these points. 
     # If you have a single t_vector for prediction, add a batch dimension:
     t_vector = K.ops.expand_dims(t_vector[0:ntime_points], axis=0) # Shape: (1, num_points_sim_example)
     uddot_true = K.ops.expand_dims(K.ops.transpose(uddot_true[:, 0:ntime_points]), axis = 0) # This should be loaded from wherever we saved the information of the specific problem, together with Phi, and the modal diagonal matrices of mass, damping and stiffness.    
@@ -119,8 +119,8 @@ def main():
     
     plt.tight_layout()
     plt.savefig(os.path.join(folder_path, f'Loss_evolution.png'),dpi = 500, bbox_inches='tight')
-    plt.show()
-    plt.close()
+    # plt.show()
+    # plt.close()
 
     predictions_dict  = model.predict([t_vector, uddot_true])
     uddot_pred = predictions_dict['acceleration_output']
