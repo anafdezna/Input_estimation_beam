@@ -15,8 +15,12 @@ def main():
     from MODULES.TRAINING.keras_loadest_models import Modal_multinode_force_estimator
     
     import time  # Import the time module
-
     K.backend.set_floatx('float64')
+    
+    if K.backend.backend() == "jax" and K.backend.floatx()=='float64':
+        os.environ["JAX_ENABLE_X64"] = "True"
+        print('jax con float64')
+        
     # print(f"TensorFlow version: {tf.__version__}")
     # tf.config.list_physical_devices('GPU')  # TODO I do not find the analogous in K .
     K.utils.set_random_seed(1234)
@@ -32,6 +36,9 @@ def main():
     # If you have a single t_vector for prediction, add a batch dimension:
     t_vector = K.ops.expand_dims(t_vector[0:ntime_points], axis=0) # Shape: (1, num_points_sim_example)
     uddot_true = K.ops.expand_dims(K.ops.transpose(uddot_true[:, 0:ntime_points]), axis = 0) # This should be loaded from wherever we saved the information of the specific problem, together with Phi, and the modal diagonal matrices of mass, damping and stiffness.    
+    
+    #We need to convert the data to flotat64 if needed
+    
     n_dof = uddot_true.shape[2]
     # Loaded nodes: 
     load_locs = [5] # Specify the DOF of the loaded nodes. It will be only one or two. 
@@ -41,7 +48,7 @@ def main():
     # Training specifications        
     LR = 0.001
     batch_size = 1
-    n_epochs = 1000000
+    n_epochs = 10
     n_steps   = ntime_points -1
     # sensor_locs_tensor = [0,1,2,3,4,5,6,7,8,9,10]    # for all dOFS instrumented (there should be 9 but till I can fix this in the data generator we will keep the 11)
     # sensor_locs_tensor = [1,3,5,7,9] #for three specific DOFS instruementd
