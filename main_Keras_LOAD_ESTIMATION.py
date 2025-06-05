@@ -22,14 +22,13 @@ def main():
     K.utils.set_random_seed(1234)
 
     # --- Load dataset ---
-    system_info_path = os.path.join("Data", "System_info_9modes.npy")
+    system_info_path = os.path.join("Data", "System_info_9modes_shorter.npy.npy")
     system_info = np.load(system_info_path, allow_pickle = True).item()
     n_modes, Phi, m_col, c_col, k_col, uddot_true, t_vector, F_true = system_info['n_modes'], system_info['Phi'], system_info['m_col'], system_info['c_col'], system_info['k_col'], system_info['uddot_true'], system_info['t_vector'], system_info['F_true']
-    # You can also remove the modes here rather than solving the problem different times for different n_modes. 
     
     # --- Specify time and loading details
     # num_points_sim_example = F_true.shape[1] # Example value from your Newmark_beta_solver context
-    ntime_points = 400
+    ntime_points = 250
     # If you have a single t_vector for prediction, add a batch dimension:
     t_vector = K.ops.expand_dims(t_vector[0:ntime_points], axis=0) # Shape: (1, num_points_sim_example)
     uddot_true = K.ops.expand_dims(K.ops.transpose(uddot_true[:, 0:ntime_points]), axis = 0) # This should be loaded from wherever we saved the information of the specific problem, together with Phi, and the modal diagonal matrices of mass, damping and stiffness.    
@@ -54,12 +53,13 @@ def main():
     early_stopping = K.callbacks.EarlyStopping(
         monitor='val_loss',  # Monitor validation loss
         patience=10000,         # Number of epochs with no improvement after which training will be stopped
-        min_delta=0.0001,    # Minimum change in the monitored quantity to qualify as an improvement
+        min_delta=0.000001,    # Minimum change in the monitored quantity to qualify as an improvement
         restore_best_weights=True,  # Restore model weights from the epoch with the best value of the monitored quantity
-        verbose=1
+        verbose=0,
+        mode = 'min'
     )
     
-    heading ='Jun05ES_singleloadednode5_sensorsatnodes1'
+    heading ='Jun05_Shorter_ESsmall_singleloadednode5_sensorsatnodes1'
     filename = f'{heading}_{ntime_points}timepoints_{n_sensors}sensors_{n_modes}modes_{LR}LR_{n_epochs}epochs'
     folder_path = os.path.join('Output', 'Preliminary_results', filename)
     if not os.path.exists(folder_path):
@@ -120,6 +120,7 @@ def main():
     plt.tight_layout()
     plt.savefig(os.path.join(folder_path, f'Loss_evolution.png'),dpi = 500, bbox_inches='tight')
     plt.show()
+    plt.close()
 
     predictions_dict  = model.predict([t_vector, uddot_true])
     uddot_pred = predictions_dict['acceleration_output']
