@@ -5,7 +5,7 @@ Created on Fri May 23 10:38:08 2025
 
 @author: afernandez
 """
-import tensorflow.keras as K 
+import keras as K 
 # # Ensure Keras 3 features are available
 # if not hasattr(K, 'ops'):
 #     raise ImportError("This implementation requires Keras 3 with keras.ops module.")

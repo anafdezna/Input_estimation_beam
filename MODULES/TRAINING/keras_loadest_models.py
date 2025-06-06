@@ -7,14 +7,16 @@ Created on Fri May 23 10:49:00 2025
 """
 
 import os
-import tensorflow.keras as K 
+import keras as K 
 from MODULES.TRAINING.keras_loadest_architectures import Fully_connected_arch_multinode
 from MODULES.TRAINING.keras_loadest_functions import Newmark_beta_solver_keras
 
 # --- 0. TensorFlow Setup ---
 # Ensure TensorFlow uses float64 for better numerical stability in FEM calculations
-K.backend.set_floatx('float64')
-K.utils.set_random_seed(1234)
+
+#Only once in the main!
+# K.backend.set_floatx('float64')
+# K.utils.set_random_seed(1234)
 
 class Modal_multinode_force_estimator(K.Model):
     def __init__(self, num_points_sim, n_modes, n_steps, n_dof, Phi, m_col, c_col, k_col, sensor_locs, load_locs, n_loadnodes, **kwargs):

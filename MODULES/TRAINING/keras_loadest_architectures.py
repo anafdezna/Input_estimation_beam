@@ -6,7 +6,7 @@ Created on Fri May 23 10:53:45 2025
 @author: afernandez
 """
 
-import tensorflow.keras as K 
+import keras as K 
 
 # architecture for multinode load (although we will start using it for one loaded node)
 def Fully_connected_arch_multinode(num_points_sim, n_modes, n_loadnodes):
