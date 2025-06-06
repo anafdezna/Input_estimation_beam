@@ -22,7 +22,7 @@ def main():
     K.utils.set_random_seed(1234)
 
     # --- Load dataset ---
-    system_info_path = os.path.join("Data", "System_info_9modes.npy")
+    system_info_path = os.path.join("Data", "System_info_9modes_numpy.npy")
     system_info = np.load(system_info_path, allow_pickle = True).item()
     n_modes, Phi, m_col, c_col, k_col, uddot_true, t_vector, F_true = system_info['n_modes'], system_info['Phi'], system_info['m_col'], system_info['c_col'], system_info['k_col'], system_info['uddot_true'], system_info['t_vector'], system_info['F_true']
     
