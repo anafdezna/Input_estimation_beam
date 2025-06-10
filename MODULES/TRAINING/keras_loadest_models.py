@@ -75,7 +75,6 @@ class Modal_multinode_force_estimator(K.Model):
         # Fpred: (batch_size, num_points_sim, n_dof)
         # Qpred: (batch_size, num_points_sim, n_modes) using einsum: 'md,btd->btm'
         Qpred = K.ops.einsum('md,btd->btm', Phi_transp, Fpred)
-        self.Qpred_history = Qpred # Storing for potential access in loss/metrics
 
         # Solve the system of uncoupled ODEs in modal coordinates using Newmark-beta
         uddot_pred_full = Newmark_beta_solver_keras(
@@ -90,14 +89,13 @@ class Modal_multinode_force_estimator(K.Model):
         
         
         # Example: if u_true_all_dofs is (B, T, D) and sensor_indices is (S), output is (B, T, S)
-        self.uddot_true = K.ops.take(u_true_all_dofs, self.sensor_indices, axis=2)
         uddot_pred_at_sensors = K.ops.take(uddot_pred_full, self.sensor_indices, axis=2)
         
-        return {"acceleration_output": uddot_pred_at_sensors, "modal_force_output": Qpred}
+        return {"acceleration_output": uddot_pred_at_sensors, "modal_force_output": Qpred, }
         
     def udata_loss(self, y_true, y_pred_acc):
-
-        response_squared_error = K.ops.square(self.uddot_true - y_pred_acc)
+        
+        response_squared_error = K.ops.square(y_true - y_pred_acc)
         Loss_data = K.ops.mean(response_squared_error, axis = None)
         return Loss_data
     

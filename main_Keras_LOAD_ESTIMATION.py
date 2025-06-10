@@ -6,38 +6,35 @@ Created on Thu May 22 18:00:20 2025
 @author: afernandez
 """
 
+import os
+import jax 
+# las variables del entorno hay que importarlas lo primero. 
+os.environ["KERAS_BACKEND"] = "jax" 
+os.environ["JAX_ENABLE_X64"] = "True"
+
+import keras as K
+K.backend.set_floatx('float64')
+import numpy as np 
+import time  # Import the time module
+# NOW IMPORT YOUR CUSTOM FUNCTIONS AND SCRIPTS:
+from MODULES.TRAINING.keras_loadest_models import Modal_multinode_force_estimator
+
 def main():
-    import os
-    # os.environ["KERAS_BACKEND"] = "jax" # esto yo creo que no me lo está usando
-    import keras as K
-    # import tensorflow.keras as K 
-    import numpy as np 
-    from MODULES.TRAINING.keras_loadest_models import Modal_multinode_force_estimator
     
-    import time  # Import the time module
-    K.backend.set_floatx('float64')
     
-    # if K.backend.backend() == "jax" and K.backend.floatx()=='float64':
-    #     os.environ["JAX_ENABLE_X64"] = "True"
-    #     print('jax con float64')
-        
-    # print(f"TensorFlow version: {tf.__version__}")
-    # tf.config.list_physical_devices('GPU')  # TODO I do not find the analogous in K .
     K.utils.set_random_seed(1234)
 
     # --- Load dataset ---
-    system_info_path = os.path.join("Data", "System_info_9modes_ImpulseAtn5.npy")
+    system_info_path = os.path.join("Data", "System_info_9modes_numpy.npy")
     # system_info_path = os.path.join("Data", "System_info_9modes_numpy.npy")
     system_info = np.load(system_info_path, allow_pickle = True).item()
     n_modes, Phi, m_col, c_col, k_col, uddot_true, t_vector, F_true = system_info['n_modes'], system_info['Phi'], system_info['m_col'], system_info['c_col'], system_info['k_col'], system_info['uddot_true'], system_info['t_vector'], system_info['F_true']
-    
     # --- Specify time and loading details
     # num_points_sim_example = F_true.shape[1] # Example value from your Newmark_beta_solver context
     ntime_points = 400 # I think this value is the key that prevents a faster training. We need to solve the newmark method sequentially for a time vector with all these points. 
     # If you have a single t_vector for prediction, add a batch dimension:
     t_vector = K.ops.expand_dims(t_vector[0:ntime_points], axis=0) # Shape: (1, num_points_sim_example)
     uddot_true = K.ops.expand_dims(K.ops.transpose(uddot_true[:, 0:ntime_points]), axis = 0) # This should be loaded from wherever we saved the information of the specific problem, together with Phi, and the modal diagonal matrices of mass, damping and stiffness.    
-    
     #We need to convert the data to flotat64 if needed
     
     n_dof = uddot_true.shape[2]
@@ -49,11 +46,12 @@ def main():
     # Training specifications        
     LR = 0.001
     batch_size = 1
-    n_epochs = 100000
+    n_epochs = 5
     n_steps   = ntime_points -1
     # sensor_locs_tensor = [0,1,2,3,4,5,6,7,8,9,10]    # for all dOFS instrumented (there should be 9 but till I can fix this in the data generator we will keep the 11)
     sensor_locs_tensor = [1,3,5,7,9] #for ODD DOFS instruementd
     # sensor_locs_tensor = [1] # specify the location of the sensor(s).
+    uddot_true =  K.ops.take(uddot_true, sensor_locs_tensor, axis=2)
 
     n_sensors =len(sensor_locs_tensor)
     
@@ -86,9 +84,9 @@ def main():
         
     model = Modal_multinode_force_estimator(ntime_points, n_modes, n_steps, n_dof, Phi, m_col, c_col, k_col, sensor_locs_tensor, load_locs, n_loadnodes)
     model.compile(optimizer=K.optimizers.RMSprop(learning_rate = LR), 
-                  loss={'acceleration_output': model.udata_loss}, # Apply udata_loss to this specific output
-                  loss_weights={'acceleration_output': 1.0} # Only train on accel loss
-                 )
+                  loss={'acceleration_output': model.udata_loss} # Apply udata_loss to this specific output
+                   # Only train on accel loss
+                   )
 
     start_time = time.time()  # Record the starting time just before training
     model_history = model.fit(x = [t_vector, uddot_true],
@@ -180,10 +178,15 @@ def main():
     plt.savefig(os.path.join(folder_path, f'response_prediction_sensor{i+1}.png'),dpi = 500, bbox_inches='tight')
     plt.show()
 
-    import tensorflow as tf # TODO I need to find the expression for pseudo-inverse in keras, which I could not find yet. 
     ## trying to see the recovery of the load: 
-    Phi_T = K.ops.transpose(Phi)
-    pseudoinv_Phi = tf.linalg.pinv(Phi_T)
+    Phi_T = K.ops.transpose(Phi)    
+    
+    with jax.default_device(jax.devices("cpu")[0]):
+        pseudoinv_Phi = jax.numpy.linalg.pinv(Phi_T)
+
+
+
+    # pseudoinv_Phi = jax.numpy.linalg.pinv(Phi_T)
     F_pred = K.ops.einsum('dm,btm->btd', pseudoinv_Phi, Q_pred)
 
     # Comparison of the estimated vs the true load at the known loaded node. (or nodes when it is the case)

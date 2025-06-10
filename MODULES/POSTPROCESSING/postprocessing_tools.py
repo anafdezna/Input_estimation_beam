@@ -4,16 +4,16 @@ Created on Mon Aug 24 10:52:37 2020
 
 @author: 109457
 """
-import numpy as np
-import pandas
-import seaborn
-import keras as K
-import scipy
-import sklearn
 import os 
-import matplotlib
+import numpy as np
+# import pandas
+# import seaborn
+import keras as K
+# import scipy
+# import sklearn
+# import matplotlib
 from matplotlib import pyplot as plt
-from sklearn.metrics import r2_score
+# from sklearn.metrics import r2_score
 # from MODULES.TRAINING.deterministic_models import My_Inverse_withPhysics, My_Inverse
 
 

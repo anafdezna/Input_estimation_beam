@@ -1,7 +1,7 @@
-__pycache__/
+/__pycache__/
 */__pycache__/*
 *.pyc
-*.spyproject
+*.spyproject/*
 
 Figures/
 Figures*/

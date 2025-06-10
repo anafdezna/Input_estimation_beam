@@ -139,7 +139,7 @@ def Newmark_beta_solver_keras(Qpred, t_vector, Phi, m_col, c_col, k_col, n_steps
     # Instantiate the RNN cell and layer
     cell = NewmarkStepCell(m_col, c_col, k_col, 
                            beta_newmark_k, gamma_newmark_k, n_m, dtype=dtype)
-    rnn_layer = K.layers.RNN(cell, return_sequences=True, return_state=False)
+    rnn_layer = K.layers.RNN(cell, return_sequences=True, return_state=False, unroll = False)
     
     # Execute RNN with the combined input
     scan_results_tuple = rnn_layer(rnn_combined_input, initial_state=initial_rnn_states)
