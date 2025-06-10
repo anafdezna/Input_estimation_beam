@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['main_Keras_LOAD_ESTIMATION.py', 'MODULES/TRAINING/keras_loadest_functions.py', 'MODULES/TRAINING/keras_loadest_architectures.py', 'MODULES/TRAINING/keras_loadest_models.py', 'MODULES/POSTPROCESSING/load_models_for_analysis.py']
+recent_files = ['main_Keras_LOAD_ESTIMATION.py', 'MODULES/TRAINING/keras_loadest_functions.py', 'MODULES/TRAINING/keras_loadest_architectures.py', 'MODULES/TRAINING/keras_loadest_models.py', 'MODULES/POSTPROCESSING/load_models_for_analysis.py', '../GMM_reparametrization/MODULES/POSTPROCESSING/GMixture_functions_for_metrics.py', '../GMM_reparametrization/MODULES/POSTPROCESSING/PLOT_METRICS_comparison.py']
 
 [main]
 version = 0.2.0

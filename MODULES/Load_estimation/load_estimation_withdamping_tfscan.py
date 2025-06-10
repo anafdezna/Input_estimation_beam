@@ -202,31 +202,112 @@ k_col = tf.reshape(k_q, (n_m, 1))      # Modal stiffnesses [n_m, 1]
 c_col = tf.reshape(c_q, (n_m, 1))      # Modal damping coefficients [n_m, 1]
 m_col = tf.ones_like(k_col)          # Modal masses (all 1s due to normalization) [n_m, 1]
 
-#%%#######################################################################################
-# --- 7. Define Load and Time Parameters ---
-# External Force Definition
-force_amplitude = tf.constant(5.0, dtype=tf.float64)         # Amplitude of the sinusoidal force
-forcing_frequency_hz = tf.constant(30, dtype=tf.float64)    # Frequency of the force in Hz. Be careful with Nyquist frequency for the exitation  freq. decision
-forcing_frequency_rad = 2.0 * np.pi * forcing_frequency_hz # Convert frequency to rad/s
-Omega_force = forcing_frequency_rad                             # Angular frequency of the force
+# %% #######################################################################################
+## ORIGINAL APPROACH: SINUSOIDAL LOAD AFFECTING THE BEAM AT MIDDLE LENGHT. 
+# # --- 7. Define Load and Time Parameters ---
+# # External Force Definition
+# force_amplitude = tf.constant(5.0, dtype=tf.float64)         # Amplitude of the sinusoidal force
+# forcing_frequency_hz = tf.constant(30, dtype=tf.float64)    # Frequency of the force in Hz. Be careful with Nyquist frequency for the exitation  freq. decision
+# forcing_frequency_rad = 2.0 * np.pi * forcing_frequency_hz # Convert frequency to rad/s
+# Omega_force = forcing_frequency_rad                             # Angular frequency of the force
 
-# Time Integration Parameters
+# # Time Integration Parameters
+# t_max_sim = tf.constant(0.5, dtype=tf.float64) # Total simulation time
+# dt = tf.constant(0.001, dtype=tf.float64)      # Time step for integration (chosen small enough for 100Hz forcing & system modes)
+# load_start_time = tf.constant(0.05, dtype=tf.float64) # Time when the load starts
+# load_end_time = tf.constant(0.15, dtype=tf.float64)   # Time when the load ends
+
+# # Calculate time vector
+# n_steps = tf.cast(tf.round(t_max_sim / dt), dtype=tf.int32) # Number of time steps
+# start_time_sim = tf.constant(0.0, dtype=tf.float64)
+# num_points_sim = n_steps + 1  # Total number of time points (including t=0)
+# t_vector = tf.linspace(start_time_sim, t_max_sim, num_points_sim) # Time vector
+# actual_dt = t_vector[1] - t_vector[0]                  # Actual time step used by linspace
+# print(f"\nTime vector from {t_vector[0]:.3f}s to {t_vector[-1]:.3f}s with {num_points_sim} points, actual_dt = {actual_dt:.6f}s.")
+
+# # Define Load Application Point (spatial distribution of the force)
+# center_dof_index = n_dof_vertical // 2 # Example: force at the vertical DOF of the center node
+# # Ensure load is not applied to a constrained DOF
+# if center_dof_index in constrained_dofs.numpy():
+#     print(f"WARNING: Load application at center_dof_index {center_dof_index} which is constrained! Adjusting.")
+#     # Basic adjustment: try next or previous if possible (simple example)
+#     if center_dof_index + 1 < n_dof_vertical and (center_dof_index + 1) not in constrained_dofs.numpy():
+#         center_dof_index = center_dof_index + 1
+#     elif center_dof_index - 1 >= 0 and (center_dof_index - 1) not in constrained_dofs.numpy():
+#         center_dof_index = center_dof_index - 1
+#     else: # Fallback if no simple adjustment works
+#         # Find first available free DOF if center adjustment fails (more robust)
+#         available_free_dofs = [dof for dof in free_dofs.numpy() if 0 < dof < n_dof_vertical-1] # prefer internal
+#         if available_free_dofs: center_dof_index = available_free_dofs[len(available_free_dofs)//2]
+#         else: center_dof_index = free_dofs.numpy()[0] # any free dof as last resort
+#         print(f"Load application point shifted to DOF index: {center_dof_index}")
+# print(f"Load applied at vertical DOF index: {center_dof_index}")
+
+# # Create load vector p (defines which DOF the force magnitude F(t) applies to)
+# load_vector_p_physical = np.zeros(n_dof_vertical)
+# load_vector_p_physical[center_dof_index] = 1.0 # Unit force at the specified DOF
+# p_force_location = tf.constant(load_vector_p_physical, shape=(n_dof_vertical, 1), dtype=tf.float64)
+
+# # Define Force Magnitude F(t) over Time
+# F_t_sinusoidal = force_amplitude * tf.sin(Omega_force * t_vector) # Sinusoidal part
+# # Apply a time window for the load
+# mask_load_active = tf.logical_and(t_vector >= load_start_time, t_vector <= load_end_time)
+# time_mask_for_load = tf.cast(mask_load_active, dtype=tf.float64)
+# F_t_magnitude = F_t_sinusoidal * time_mask_for_load # Force magnitude F(t)
+
+# # Calculate Full Nodal Force Vector F(t) in physical coordinates
+# F_t_physical = p_force_location @ tf.expand_dims(F_t_magnitude, axis=0) # Shape [n_dof_vertical, num_points_sim]
+# # Transform to Modal Force Vector Q(t)
+# Q_t_modal = tf.transpose(Phi) @ F_t_physical # Shape [n_m, num_points_sim]
+# %% #####################################################################################################################################################
+#### EXPLORING A LOAD THAT IS AN IMPULSE (TRIANGULAR LOADING OF VERY SHORT DURATION)
+# --- 7. Define Load and Time Parameters ---
+
+# --- Impulse Load Definition ---
+# An impulse is approximated by a triangular force over a very short duration.
+impulse_magnitude = tf.constant(1.0, dtype=tf.float64)       # Total impulse in N*s. This is the area under the force-time curve.
+impulse_duration = tf.constant(0.002, dtype=tf.float64)      # Duration of the triangular pulse (should be very short).
+impulse_start_time = tf.constant(0.05, dtype=tf.float64)      # Time when the impulse load starts.
+
+# --- Time Integration Parameters ---
 t_max_sim = tf.constant(0.5, dtype=tf.float64) # Total simulation time
-dt = tf.constant(0.001, dtype=tf.float64)      # Time step for integration (chosen small enough for 100Hz forcing & system modes)
-load_start_time = tf.constant(0.05, dtype=tf.float64) # Time when the load starts
-load_end_time = tf.constant(0.15, dtype=tf.float64)   # Time when the load ends
+dt = tf.constant(0.001, dtype=tf.float64)     # Time step for integration
 
 # Calculate time vector
-n_steps = tf.cast(tf.round(t_max_sim / dt), dtype=tf.int32) # Number of time steps
+n_steps = tf.cast(tf.round(t_max_sim / dt), dtype=tf.int32)
 start_time_sim = tf.constant(0.0, dtype=tf.float64)
-num_points_sim = n_steps + 1  # Total number of time points (including t=0)
-t_vector = tf.linspace(start_time_sim, t_max_sim, num_points_sim) # Time vector
-actual_dt = t_vector[1] - t_vector[0]                  # Actual time step used by linspace
+num_points_sim = n_steps + 1
+t_vector = tf.linspace(start_time_sim, t_max_sim, num_points_sim)
+actual_dt = t_vector[1] - t_vector[0]
 print(f"\nTime vector from {t_vector[0]:.3f}s to {t_vector[-1]:.3f}s with {num_points_sim} points, actual_dt = {actual_dt:.6f}s.")
 
-# Define Load Application Point (spatial distribution of the force)
+# --- Define Force Magnitude F(t) over Time (Triangular Pulse) ---
+# Calculate parameters for the triangular pulse
+impulse_end_time = impulse_start_time + impulse_duration
+impulse_peak_time = impulse_start_time + impulse_duration / 2.0
+# The peak force is calculated so the triangle's area equals the impulse_magnitude
+# Area = 0.5 * base * height => height = 2 * Area / base
+peak_force = (2.0 * impulse_magnitude) / impulse_duration
+
+# 1. Ramp-up phase
+slope_up = peak_force / (impulse_peak_time - impulse_start_time)
+force_up = slope_up * (t_vector - impulse_start_time)
+mask_up = tf.logical_and(t_vector >= impulse_start_time, t_vector <= impulse_peak_time)
+F_t_ramp_up = tf.where(mask_up, force_up, 0.0)
+
+# 2. Ramp-down phase
+slope_down = -peak_force / (impulse_end_time - impulse_peak_time)
+force_down = peak_force + slope_down * (t_vector - impulse_peak_time)
+mask_down = tf.logical_and(t_vector > impulse_peak_time, t_vector <= impulse_end_time)
+F_t_ramp_down = tf.where(mask_down, force_down, 0.0)
+
+# Combine the two phases to get the final triangular force magnitude over time
+F_t_magnitude = F_t_ramp_up + F_t_ramp_down
+
+# --- Define Load Application Point (spatial distribution of the force) ---
+# This part remains the same, applying the force to the beam's center.
 center_dof_index = n_dof_vertical // 2 # Example: force at the vertical DOF of the center node
-# Ensure load is not applied to a constrained DOF
+# Ensure load is not applied to a constrained DOF (your original safety check code)
 if center_dof_index in constrained_dofs.numpy():
     print(f"WARNING: Load application at center_dof_index {center_dof_index} which is constrained! Adjusting.")
     # Basic adjustment: try next or previous if possible (simple example)
@@ -240,25 +321,21 @@ if center_dof_index in constrained_dofs.numpy():
         if available_free_dofs: center_dof_index = available_free_dofs[len(available_free_dofs)//2]
         else: center_dof_index = free_dofs.numpy()[0] # any free dof as last resort
         print(f"Load application point shifted to DOF index: {center_dof_index}")
-print(f"Load applied at vertical DOF index: {center_dof_index}")
+print(f"Impulse load applied at vertical DOF index: {center_dof_index}")
+
 
 # Create load vector p (defines which DOF the force magnitude F(t) applies to)
 load_vector_p_physical = np.zeros(n_dof_vertical)
 load_vector_p_physical[center_dof_index] = 1.0 # Unit force at the specified DOF
 p_force_location = tf.constant(load_vector_p_physical, shape=(n_dof_vertical, 1), dtype=tf.float64)
 
-# Define Force Magnitude F(t) over Time
-F_t_sinusoidal = force_amplitude * tf.sin(Omega_force * t_vector) # Sinusoidal part
-# Apply a time window for the load
-mask_load_active = tf.logical_and(t_vector >= load_start_time, t_vector <= load_end_time)
-time_mask_for_load = tf.cast(mask_load_active, dtype=tf.float64)
-F_t_magnitude = F_t_sinusoidal * time_mask_for_load # Force magnitude F(t)
-
+# --- Calculate Full Nodal Force and Transform to Modal Coordinates ---
 # Calculate Full Nodal Force Vector F(t) in physical coordinates
 F_t_physical = p_force_location @ tf.expand_dims(F_t_magnitude, axis=0) # Shape [n_dof_vertical, num_points_sim]
 # Transform to Modal Force Vector Q(t)
 Q_t_modal = tf.transpose(Phi) @ F_t_physical # Shape [n_m, num_points_sim]
-# #%% ####################################################################################################################################33
+
+# %% ####################################################################################################################################33
 # # EXPLORING A LOAD APPLIED IN TWO NODES: 
 
 # # Time Integration Parameters (Common for both loads)
@@ -458,17 +535,17 @@ uddot_t = uddot_pred
 
 System_info = {
         'n_modes':n_modes,
-        'Phi':Phi,
-        'm_col': m_col, 
-        'c_col':c_col, 
-        'k_col': k_col, 
-        'uddot_true': uddot_t,
-        't_vector': t_vector,
-        'F_true': F_t_physical,
+        'Phi':Phi.numpy(),
+        'm_col': m_col.numpy(), 
+        'c_col':c_col.numpy(), 
+        'k_col': k_col.numpy(), 
+        'uddot_true': uddot_t.numpy(),
+        't_vector': t_vector.numpy(),
+        'F_true': F_t_physical.numpy(),
         }
 
 prueba_path = os.path.join("Data")
-np.save(os.path.join(prueba_path, f'System_info_{n_m}modes_shorter.npy'), System_info, allow_pickle=True)
+np.save(os.path.join(prueba_path, f'System_info_{n_m}modes_ImpulseAtn5.npy'), System_info, allow_pickle=True)
 
 
 # YOu need to vectorize this function in order to accommodate batch dimension (even if it is 1) Otherwise it is doing a wrong transpose

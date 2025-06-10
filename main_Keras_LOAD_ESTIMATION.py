@@ -8,7 +8,7 @@ Created on Thu May 22 18:00:20 2025
 
 def main():
     import os
-    os.environ["KERAS_BACKEND"] = "jax" # esto yo creo que no me lo está usando
+    # os.environ["KERAS_BACKEND"] = "jax" # esto yo creo que no me lo está usando
     import keras as K
     # import tensorflow.keras as K 
     import numpy as np 
@@ -17,16 +17,17 @@ def main():
     import time  # Import the time module
     K.backend.set_floatx('float64')
     
-    if K.backend.backend() == "jax" and K.backend.floatx()=='float64':
-        os.environ["JAX_ENABLE_X64"] = "True"
-        print('jax con float64')
+    # if K.backend.backend() == "jax" and K.backend.floatx()=='float64':
+    #     os.environ["JAX_ENABLE_X64"] = "True"
+    #     print('jax con float64')
         
     # print(f"TensorFlow version: {tf.__version__}")
     # tf.config.list_physical_devices('GPU')  # TODO I do not find the analogous in K .
     K.utils.set_random_seed(1234)
 
     # --- Load dataset ---
-    system_info_path = os.path.join("Data", "System_info_9modes_numpy.npy")
+    system_info_path = os.path.join("Data", "System_info_9modes_ImpulseAtn5.npy")
+    # system_info_path = os.path.join("Data", "System_info_9modes_numpy.npy")
     system_info = np.load(system_info_path, allow_pickle = True).item()
     n_modes, Phi, m_col, c_col, k_col, uddot_true, t_vector, F_true = system_info['n_modes'], system_info['Phi'], system_info['m_col'], system_info['c_col'], system_info['k_col'], system_info['uddot_true'], system_info['t_vector'], system_info['F_true']
     
@@ -48,11 +49,11 @@ def main():
     # Training specifications        
     LR = 0.001
     batch_size = 1
-    n_epochs = 10
+    n_epochs = 100000
     n_steps   = ntime_points -1
     # sensor_locs_tensor = [0,1,2,3,4,5,6,7,8,9,10]    # for all dOFS instrumented (there should be 9 but till I can fix this in the data generator we will keep the 11)
-    # sensor_locs_tensor = [1,3,5,7,9] #for three specific DOFS instruementd
-    sensor_locs_tensor = [1] # specify the location of the sensor(s).
+    sensor_locs_tensor = [1,3,5,7,9] #for ODD DOFS instruementd
+    # sensor_locs_tensor = [1] # specify the location of the sensor(s).
 
     n_sensors =len(sensor_locs_tensor)
     
@@ -60,13 +61,13 @@ def main():
     early_stopping = K.callbacks.EarlyStopping(
         monitor='val_loss',  # Monitor validation loss
         patience=10000,         # Number of epochs with no improvement after which training will be stopped
-        min_delta=0.000001,    # Minimum change in the monitored quantity to qualify as an improvement
+        min_delta=0.00000001,    # Minimum change in the monitored quantity to qualify as an improvement
         restore_best_weights=True,  # Restore model weights from the epoch with the best value of the monitored quantity
         verbose=0,
         mode = 'min'
     )
     
-    heading ='Jun05_Shorter_ESsmall_singleloadednode5_sensorsatnodes1'
+    heading ='Jun06_ES_Impulse5_sensorsatnodes13579'
     filename = f'{heading}_{ntime_points}timepoints_{n_sensors}sensors_{n_modes}modes_{LR}LR_{n_epochs}epochs'
     folder_path = os.path.join('Output', 'Preliminary_results', filename)
     if not os.path.exists(folder_path):
@@ -96,7 +97,7 @@ def main():
       epochs = n_epochs,
       shuffle = True,
       validation_data = ([t_vector, uddot_true], uddot_true),
-      callbacks = [early_stopping])
+      callbacks = [])
 
 
     model.save_weights(os.path.join(folder_path, "Weights_ae.weights.h5"), overwrite = True)                        
@@ -135,7 +136,9 @@ def main():
         
     uddot_true = K.ops.take(uddot_true,sensor_locs_tensor, axis=2)
 
+# %%
     
+
     ## plot the response at a certain sensor (at a certain node) 
     i = 0
     Dt = 0.001 # Your time step
